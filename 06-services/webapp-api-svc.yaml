@@ -1,0 +1,14 @@
+# Slide 44 - Create and test a ClusterIP Service
+apiVersion: v1
+kind: Service
+metadata: { name: webapp-api-svc, namespace: webapp-stack }
+spec:
+  type: ClusterIP
+  selector: { app: webapp-api }       # must match the Pod labels
+  ports:
+    - port: 80                 # the Service's port
+      targetPort: 8081         # the container's port (or a name: http)
+---
+# Test from inside the cluster
+# kubectl run curl -n webapp-stack --rm -it --image=curlimages/curl \
+#   --restart=Never -- curl -s http://webapp-api-svc

@@ -1,0 +1,88 @@
+############################################################
+# 03 - CONFIGMAPS & SECRETS  (Chapter 3 - slides 25-33, 72)
+# Build the image once; change configuration per environment.
+############################################################
+
+# --- Slide 28: ConfigMap - imperative ---
+kubectl create cm demo-config -n webapp-stack --from-literal=LOG_LEVEL=info
+echo 'server { listen 8081; }' > default.conf
+kubectl create cm nginx-config -n webapp-stack --from-file=default.conf
+kubectl get cm -n webapp-stack
+kubectl get cm nginx-config -n webapp-stack -o yaml
+kubectl delete cm demo-config nginx-config -n webapp-stack; rm default.conf
+
+
+# --- Slide 29: ConfigMap as env vars and as a file ---
+kubectl apply -f 03-configmaps-secrets/webapp-config.yaml
+kubectl get cm webapp-config -n webapp-stack -o yaml
+kubectl apply -f 03-configmaps-secrets/nginx-config-pod.yaml
+kubectl get pod nginx-config -n webapp-stack
+
+# Verify: env var
+kubectl exec -n webapp-stack nginx-config -- printenv LOG_LEVEL
+#   info
+# envFrom skips invalid names -> default.conf is NOT an env var, only a file
+kubectl exec -n webapp-stack nginx-config -- cat /etc/nginx/conf.d/default.conf
+kubectl exec -n webapp-stack nginx-config -- curl -s localhost:8081 | head -n 4
+
+# Change the port in the ConfigMap, restart the Pod, show nginx on the new port
+kubectl edit cm webapp-config -n webapp-stack          # listen 8081 -> 8082
+kubectl delete pod nginx-config -n webapp-stack
+kubectl apply -f 03-configmaps-secrets/nginx-config-pod.yaml
+kubectl exec -n webapp-stack nginx-config -- cat /etc/nginx/conf.d/default.conf
+# (set it back to 8081 afterwards - the Services chapter uses 8081)
+
+
+# --- Slide 30/31: Secrets and the base64 trap ---
+kubectl create secret generic mysql-secret -n webapp-stack \
+  --from-literal=DB_USER=app --from-literal=DB_PASSWORD='S3cret!'
+#   or declaratively:  kubectl apply -f 03-configmaps-secrets/mysql-secret.yaml
+
+kubectl get secret mysql-secret -n webapp-stack -o yaml   # values are base64
+kubectl get secret mysql-secret -n webapp-stack \
+  -o jsonpath='{.data.DB_PASSWORD}' | base64 -d
+#   S3cret!
+
+# A Pod reading the Secret through envFrom: secretRef
+kubectl apply -f 03-configmaps-secrets/secret-env-pod.yaml
+kubectl logs -n webapp-stack secret-reader
+kubectl delete pod secret-reader -n webapp-stack
+
+# Change a Secret value (re-create in place), then restart the Pods that use it
+kubectl create secret generic mysql-secret -n webapp-stack \
+  --from-literal=DB_USER=app --from-literal=DB_PASSWORD='N3wS3cret!' \
+  --dry-run=client -o yaml | kubectl apply -f -
+# kubectl rollout restart deployment/<name> -n webapp-stack
+
+# TLS Secret (reference)
+# kubectl create secret tls web-tls -n webapp-stack --cert=c.crt --key=c.key
+
+# A Pod can only use Secrets from its OWN namespace:
+kubectl get secret mysql-secret -n default        # NotFound
+
+
+# --- Slide 72: encryption at rest (reference only, self-managed clusters) ---
+head -c 32 /dev/urandom | base64                   # key for encryption-config.yaml
+# kubectl get secrets -A -o json | kubectl replace -f -
+
+
+############################################################
+# Slide 32 - Configuration best practices
+############################################################
+# 1 Never commit real Secrets  -> Sealed Secrets, External Secrets Operator, cloud secret manager
+# 2 Encrypt etcd               -> encryption at rest + RBAC on "get secrets"
+# 3 Prefer files for secrets   -> env vars leak into logs, crash dumps, child processes
+# 4 immutable: true            -> avoids drift, reduces API server load
+# 5 Version config names       -> webapp-config-v2: clean rollout, easy rollback
+# 6 One ConfigMap per app      -> same namespace as the app
+
+############################################################
+# Check yourself (slide 33) - answers
+############################################################
+# 1) Only DB_PASSWORD goes in a Secret.
+# 2) Env vars are read once at start -> kubectl rollout restart. Mounted files refresh in ~1 min
+#    (but NOT when mounted with subPath).
+# 3) No - base64 is encoding. Turn on encryption at rest and guard with RBAC.
+# 4) envFrom skips invalid env names (default.conf) -> mount it as a file.
+
+# NOTE: keep webapp-config (listen 8081) and mysql-secret - later chapters use them.

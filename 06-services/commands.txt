@@ -1,0 +1,75 @@
+############################################################
+# 06 - SERVICES  (Chapter 5 part 2 - slides 41-49, 74-75)
+# A stable address in front of changing Pods.
+# Needs webapp-api Deployment from 05-labels-selectors.
+############################################################
+
+# --- Slide 44: ClusterIP Service ---
+kubectl apply -f 06-services/webapp-api-svc.yaml
+#   imperative shortcut:
+#   kubectl expose deployment webapp-api -n webapp-stack --name=webapp-api-svc --port=80 --target-port=8081
+
+kubectl get svc,endpointslices -n webapp-stack
+kubectl describe svc webapp-api-svc -n webapp-stack
+
+# Check endpoints FIRST - empty = selector or readiness problem
+kubectl get endpointslices -n webapp-stack -l kubernetes.io/service-name=webapp-api-svc
+kubectl describe endpointslice -n webapp-stack -l kubernetes.io/service-name=webapp-api-svc
+
+# Test from inside the cluster with a throwaway Pod
+kubectl run curl -n webapp-stack --rm -it --image=curlimages/curl \
+  --restart=Never -- curl -s http://webapp-api-svc
+
+# Load balancing: scale and watch endpoints change
+kubectl scale deployment webapp-api -n webapp-stack --replicas=3
+kubectl get endpointslices -n webapp-stack -l kubernetes.io/service-name=webapp-api-svc
+kubectl scale deployment webapp-api -n webapp-stack --replicas=2
+
+
+# --- Slide 43: break it - wrong targetPort -> connection refused ---
+kubectl patch svc webapp-api-svc -n webapp-stack \
+  -p '{"spec":{"ports":[{"port":80,"targetPort":8080}]}}'
+kubectl run curl -n webapp-stack --rm -it --image=curlimages/curl \
+  --restart=Never -- curl -s -m 3 http://webapp-api-svc       # fails
+kubectl apply -f 06-services/webapp-api-svc.yaml                # fix it
+
+
+# --- Slide 48: reaching a Service from outside ---
+# NodePort
+kubectl expose deployment webapp-api -n webapp-stack --name=web-np \
+  --type=NodePort --port=80 --target-port=8081
+#   or: kubectl apply -f 06-services/web-nodeport-svc.yaml   (fixed nodePort 30080)
+kubectl get svc web-np -n webapp-stack                 # PORT(S) 80:3xxxx/TCP
+minikube service web-np -n webapp-stack --url          # prints a URL
+minikube ip                                             # http://<minikube ip>:<nodePort>
+
+# LoadBalancer - on a laptop, minikube tunnel plays the cloud
+kubectl expose deployment webapp-api -n webapp-stack --name=web-lb \
+  --type=LoadBalancer --port=80 --target-port=8081
+#   or: kubectl apply -f 06-services/web-loadbalancer-svc.yaml
+minikube tunnel                                         # keep it running (2nd terminal)
+kubectl get svc web-lb -n webapp-stack                  # EXTERNAL-IP appears (else <pending>)
+curl http://<EXTERNAL-IP>
+
+# Note: a LoadBalancer Service also has a nodePort and a clusterIP (types nest)
+kubectl get svc -n webapp-stack -o wide
+
+# Clean up
+kubectl delete svc web-np web-lb -n webapp-stack
+
+
+# --- Slide 75: Headless and ExternalName (reference) ---
+kubectl apply -f 06-services/special-services.yaml
+kubectl get svc mysql payments-db -n webapp-stack       # CLUSTER-IP None / EXTERNAL-IP db.example.com
+kubectl run dns-test -n webapp-stack --rm -it --image=busybox:1.36 --restart=Never -- \
+  nslookup payments-db                                  # CNAME -> db.example.com
+kubectl delete -f 06-services/special-services.yaml
+
+
+############################################################
+# Check yourself (slide 49) - answers
+############################################################
+# 1) No endpoints: compare the selector with the Pod labels, then check the Pods are Ready.
+# 2) Connection refused: targetPort differs from the port the container listens on.
+# 3) From another namespace: mysql-svc.webapp-stack (or mysql-svc.webapp-stack.svc.cluster.local).
+# 4) One paid cloud LB per app gets expensive -> an Ingress shares one.

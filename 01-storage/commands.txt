@@ -1,0 +1,86 @@
+############################################################
+# 01 - STORAGE  (Chapter 1 - slides 6-18)
+# Keep data alive when Pods come and go.
+############################################################
+
+# --- Slide 10: emptyDir (lives only as long as the Pod) ---
+kubectl apply -f 01-storage/writer-pod-emptydir.yaml
+kubectl exec -n webapp-stack writer -- sh -c 'echo hello > /data/note.txt'
+kubectl exec -n webapp-stack writer -- cat /data/note.txt
+kubectl delete pod -n webapp-stack writer
+kubectl apply -f 01-storage/writer-pod-emptydir.yaml
+kubectl exec -n webapp-stack writer -- cat /data/note.txt     # No such file -> data is gone
+kubectl delete pod -n webapp-stack writer
+
+
+# --- Slide 13: static provisioning (PV + PVC) ---
+kubectl apply -f 01-storage/data-pv-pvc.yaml
+kubectl get pv,pvc -n webapp-stack           # both Bound
+
+# Break it on purpose: ask for 2Gi -> stays Pending
+kubectl apply -f 01-storage/data-pvc-2gi-pending.yaml
+kubectl get pvc -n webapp-stack
+kubectl describe pvc data-pvc-big -n webapp-stack
+kubectl delete pvc data-pvc-big -n webapp-stack
+
+
+# --- Slide 14: prove the data survives the Pod ---
+kubectl apply -f 01-storage/writer-pod.yaml       # mounts data-pvc at /data
+kubectl exec -n webapp-stack writer -- \
+  sh -c 'echo hello > /data/note.txt'
+
+kubectl delete pod -n webapp-stack writer    # the Pod is gone...
+kubectl apply -f 01-storage/writer-pod.yaml       # ...a new one starts
+kubectl exec -n webapp-stack writer -- cat /data/note.txt
+#   hello
+
+# Look at the data on the node itself (hostPath)
+minikube ssh -- ls -l /mnt/data
+minikube ssh -- cat /mnt/data/note.txt
+
+
+# --- Slide 12: PersistentVolumeClaim reference commands ---
+kubectl get pvc -n webapp-stack
+kubectl describe pvc data-pvc -n webapp-stack
+kubectl get pvc data-pvc -n webapp-stack -o jsonpath='{.spec.volumeName}'
+
+
+# --- Slide 68: PersistentVolume reference commands ---
+kubectl get pv
+kubectl describe pv data-pv
+
+
+# --- Slide 16: dynamic provisioning ---
+kubectl get storageclass
+kubectl describe sc standard
+kubectl apply -f 01-storage/dynamic-pvc.yaml
+kubectl get pv                                # a new pvc-xxxx PV appeared automatically
+kubectl get pvc cache-pvc -n webapp-stack
+# (AWS reference only) 01-storage/storageclass-gp3-aws.yaml
+
+
+# --- Slide 17: the life of a PersistentVolume (Available -> Bound -> Released) ---
+# Delete the writer Pod first: a PVC still mounted by a Pod is protected (pvc-protection finalizer)
+kubectl delete pod -n webapp-stack writer
+kubectl delete pvc data-pvc -n webapp-stack
+kubectl get pv data-pv                        # STATUS = Released (Retain keeps the data)
+
+# Re-create the claim -> it stays Pending, the PV still holds the old claimRef
+kubectl apply -f 01-storage/data-pv-pvc.yaml
+kubectl get pv,pvc -n webapp-stack
+
+# Admin clears the claimRef -> PV becomes Available and binds again
+kubectl patch pv data-pv -p '{"spec":{"claimRef":null}}'
+kubectl get pv,pvc -n webapp-stack           # Bound again, old data still on disk
+
+
+############################################################
+# Check yourself (slide 18) - answers
+############################################################
+# 1) data-pvc is Pending: no PV matches size, access mode or storageClassName;
+#    or no StorageClass can create one.          -> kubectl describe pvc data-pvc
+# 2) 3 replicas on 3 nodes share one volume: ReadWriteMany on file storage (EFS, NFS).
+# 3) Delete the writer Pod: with the claim the file survives; with emptyDir it is gone.
+# 4) Re-created data-pvc stays Pending: old PV is Released (Retain) and still has a claimRef.
+
+# NOTE: keep data-pvc - the Jobs & CronJobs chapter mounts it.

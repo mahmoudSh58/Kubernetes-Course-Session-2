@@ -1,0 +1,17 @@
+# Slide 75 - Headless and ExternalName Services
+# Headless: no virtual IP - DNS returns every Pod IP
+apiVersion: v1
+kind: Service
+metadata: { name: mysql, namespace: webapp-stack }
+spec:
+  clusterIP: None
+  selector: { app: mysql }
+  ports: [{ port: 3306 }]
+---
+# ExternalName: an in-cluster alias for an outside DNS name (CNAME only - no proxying)
+apiVersion: v1
+kind: Service
+metadata: { name: payments-db, namespace: webapp-stack }
+spec:
+  type: ExternalName
+  externalName: db.example.com

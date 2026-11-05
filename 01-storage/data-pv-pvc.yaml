@@ -1,0 +1,19 @@
+# Slide 13 - Static provisioning with hostPath
+# data-pvc asks for 1Gi, RWO, class "manual" - data-pv offers exactly that, so they bind.
+apiVersion: v1
+kind: PersistentVolume          # cluster-wide, no namespace
+metadata: { name: data-pv }
+spec:
+  capacity: { storage: 1Gi }
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath: { path: /mnt/data }   # a folder on one node
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: data-pvc, namespace: webapp-stack }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: manual        # must match the PV
+  resources: { requests: { storage: 1Gi } }

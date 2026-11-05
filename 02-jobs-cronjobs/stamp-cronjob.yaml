@@ -1,0 +1,24 @@
+# Slide 24 - A CronJob that updates a file
+# Every tick the CronJob stamps out a new Job, which runs a Pod to completion.
+apiVersion: batch/v1
+kind: CronJob
+metadata: { name: stamp, namespace: webapp-stack }
+spec:
+  schedule: "* * * * *"               # every minute
+  # timeZone: Africa/Cairo            # optional - cluster time is usually UTC
+  concurrencyPolicy: Forbid           # skip if last run still going
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: stamp
+              image: busybox:1.36
+              command: ["sh", "-c", "date > /data/time.txt"]
+              volumeMounts: [{ name: data, mountPath: /data }]
+          volumes:
+            - name: data
+              persistentVolumeClaim: { claimName: data-pvc }

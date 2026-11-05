@@ -1,0 +1,21 @@
+# Slide 54 notes - "Add a host: rule to route by domain name too."
+# Same route as webapp-ingress.yaml, but only for requests with Host: shop.example.com
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webapp-ingress-host
+  namespace: webapp-stack
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: shop.example.com
+      http:
+        paths:
+          - path: /home
+            pathType: Prefix
+            backend:
+              service:
+                name: webapp-api-svc
+                port: { number: 80 }

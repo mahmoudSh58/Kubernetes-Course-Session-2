@@ -1,0 +1,13 @@
+# Slides 43/48 - NodePort: declarative version of
+#   kubectl expose deployment webapp-api --name=web-np --type=NodePort --port=80 --target-port=8081
+# nodePort (30000-32767) is opened on EVERY node; it contains a ClusterIP.
+apiVersion: v1
+kind: Service
+metadata: { name: web-np, namespace: webapp-stack }
+spec:
+  type: NodePort
+  selector: { app: webapp-api }
+  ports:
+    - port: 80              # what clients inside the cluster call
+      targetPort: 8081      # where the container really listens
+      nodePort: 30080       # open on every node (omit to get a random one)

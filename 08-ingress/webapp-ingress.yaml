@@ -1,0 +1,20 @@
+# Slide 54 - Route /home to a Service
+# Needs an Ingress Controller (minikube addons enable ingress) + webapp-api-svc.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webapp-ingress
+  namespace: webapp-stack
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /   # /home -> / before it reaches the Pod
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /home
+            pathType: Prefix          # /home and /home/... ; Exact = only /home
+            backend:
+              service:
+                name: webapp-api-svc
+                port: { number: 80 }

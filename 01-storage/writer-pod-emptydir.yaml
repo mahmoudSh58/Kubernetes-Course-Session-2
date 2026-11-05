@@ -1,0 +1,16 @@
+# Slide 10 - volumes and volumeMounts: two halves
+# Read it bottom-up: first WHAT storage the Pod has, then WHERE each container sees it.
+apiVersion: v1
+kind: Pod
+metadata: { name: writer, namespace: webapp-stack }
+spec:
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:            # 2. WHERE in the container
+        - name: data           # must equal a volume's name
+          mountPath: /data
+  volumes:                     # 1. WHAT storage the Pod gets
+    - name: data
+      emptyDir: {}             # next: a PersistentVolumeClaim

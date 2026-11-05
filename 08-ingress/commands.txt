@@ -1,0 +1,49 @@
+############################################################
+# 08 - INGRESS  (Chapter 6 - slides 50-55)
+# One entry point, many applications, routed by host and path.
+# Needs webapp-api-svc from 06-services.
+############################################################
+
+# --- Slide 52: no controller, no Ingress -> install one FIRST ---
+minikube addons enable ingress
+#   or with Helm:
+#   helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+#   helm install ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx --create-namespace
+
+kubectl get pods -n ingress-nginx
+kubectl get ingressclass                                # NAME: nginx
+kubectl wait -n ingress-nginx --for=condition=ready pod \
+  -l app.kubernetes.io/component=controller --timeout=120s
+
+
+# --- Slide 54: route /home to webapp-api-svc ---
+kubectl apply -f 08-ingress/webapp-ingress.yaml
+kubectl get ingress -n webapp-stack                     # ADDRESS appears after a short while
+kubectl describe ingress webapp-ingress -n webapp-stack
+kubectl get ingress,ingressclass -A
+
+# Test it
+minikube tunnel                                         # keep it running (2nd terminal)
+curl http://127.0.0.1/home
+curl -i http://127.0.0.1/other                          # 404 - no rule for this path
+#   Linux docker driver alternative (no tunnel):  curl http://$(minikube ip)/home
+
+
+# --- Route by host name too ---
+kubectl apply -f 08-ingress/webapp-ingress-host.yaml
+curl -H 'Host: shop.example.com' http://127.0.0.1/home
+
+
+# --- Debug ---
+kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=20
+# 404 -> wrong path or class, or rewrite-target missing
+# 502/503 -> backend Service has no Ready endpoints
+kubectl get endpointslices -n webapp-stack -l kubernetes.io/service-name=webapp-api-svc
+
+# Clean up the extra example
+kubectl delete -f 08-ingress/webapp-ingress-host.yaml
+
+# Notes:
+# - Annotations are controller-specific: nginx ones do nothing on Traefik.
+# - The community ingress-nginx project was retired in March 2026: fine for learning,
+#   new production clusters use the Gateway API (see 09-gateway-api).

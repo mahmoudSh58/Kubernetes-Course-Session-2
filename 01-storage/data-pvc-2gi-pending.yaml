@@ -1,0 +1,10 @@
+# Slide 13 - "Break it on purpose"
+# Asks for 2Gi but the only "manual" PV offers 1Gi -> the claim stays Pending.
+#   kubectl describe pvc data-pvc-big -n webapp-stack   # shows why
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: data-pvc-big, namespace: webapp-stack }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: manual
+  resources: { requests: { storage: 2Gi } }

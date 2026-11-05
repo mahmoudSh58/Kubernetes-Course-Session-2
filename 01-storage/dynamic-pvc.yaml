@@ -1,0 +1,10 @@
+# Slide 16 - Dynamic provisioning with a StorageClass
+# minikube ships a default StorageClass called "standard".
+# Apply the claim and a PV appears automatically, already Bound.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: cache-pvc, namespace: webapp-stack }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: standard     # omit to use the default
+  resources: { requests: { storage: 2Gi } }

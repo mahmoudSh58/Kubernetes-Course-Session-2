@@ -1,0 +1,5 @@
+# Every demo in Session 2 runs in this namespace.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: webapp-stack

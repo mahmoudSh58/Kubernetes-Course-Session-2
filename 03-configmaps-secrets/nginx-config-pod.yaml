@@ -1,0 +1,21 @@
+# Slide 29 - "In the Pod spec" part, as a complete Pod
+#  - envFrom: every valid key becomes an env var (LOG_LEVEL)
+#  - volume:  default.conf becomes a file in /etc/nginx/conf.d
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-config
+  namespace: webapp-stack
+  labels: { app: nginx-config }
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27
+      envFrom: [{ configMapRef: { name: webapp-config } }]
+      volumeMounts:
+        - { name: conf, mountPath: /etc/nginx/conf.d }
+  volumes:
+    - name: conf
+      configMap:
+        name: webapp-config
+        items: [{ key: default.conf, path: default.conf }]

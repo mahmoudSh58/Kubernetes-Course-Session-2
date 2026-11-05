@@ -1,0 +1,32 @@
+############################################################
+# 09 - GATEWAY API  (slides 55, 76-77)  - OPTIONAL / LOOKING AHEAD
+# Platform team owns the Gateway; each app team owns its HTTPRoutes.
+############################################################
+
+# 1) Install first: Gateway API CRDs + a controller (e.g. Envoy Gateway).
+#    Follow the current install guide: https://gateway.envoyproxy.io/docs/
+#    (Helm chart oci://docker.io/envoyproxy/gateway-helm)
+kubectl get crd | grep gateway.networking.k8s.io
+kubectl get gatewayclass
+
+# 2) Namespaces from the example
+kubectl create namespace infra
+kubectl create namespace shop
+
+# 3) Apply the Gateway + weighted HTTPRoute (90% api-v1 / 10% api-v2)
+kubectl apply -f 09-gateway-api/gateway-api.yaml
+kubectl get gateway -n infra
+kubectl get httproute -n shop
+kubectl describe httproute shop-route -n shop
+
+# Cross-namespace by design: routes in "shop" attach to a Gateway in "infra".
+
+############################################################
+# Slide 55 - Ingress vs Gateway API
+############################################################
+#                    INGRESS                              GATEWAY API
+# Objects            Ingress + IngressClass               GatewayClass, Gateway, HTTPRoute, GRPCRoute
+# Who owns what      one object mixes platform+app        platform owns Gateway; apps own routes
+# Traffic splitting  vendor annotations only              built in: weights for canary releases
+# Protocols          HTTP and HTTPS                       HTTP, gRPC, TCP, UDP, TLS
+# Status in 2026     stable, frozen API                   GA, recommended for new clusters

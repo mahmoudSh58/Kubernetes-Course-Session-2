@@ -1,0 +1,28 @@
+############################################################
+# 07 - SERVICE DISCOVERY WITH COREDNS  (slides 45-46)
+# Every Pod asks CoreDNS; every Service gets a predictable DNS name.
+# Run right after 06-services so webapp-api-svc exists.
+############################################################
+
+# CoreDNS runs in kube-system and answers every Pod's DNS
+kubectl get pods -n kube-system -l k8s-app=kube-dns
+kubectl get svc -n kube-system kube-dns                 # the DNS ClusterIP in resolv.conf
+
+kubectl run dns-test -n webapp-stack --rm -it \
+  --image=busybox:1.36 --restart=Never -- sh
+/ # nslookup webapp-api-svc                                    # same namespace
+/ # nslookup webapp-api-svc.webapp-stack                       # cross-namespace
+/ # nslookup webapp-api-svc.webapp-stack.svc.cluster.local     # fully qualified
+/ # cat /etc/resolv.conf                                       # search domains
+/ # wget -qO- http://webapp-api-svc | head -n 4                # call it by name
+/ # exit
+
+# Cross-namespace test: from the default namespace the short name FAILS, the long one works
+kubectl run dns-test2 -n default --rm -it --image=busybox:1.36 --restart=Never -- \
+  nslookup webapp-api-svc                                      # NXDOMAIN
+kubectl run dns-test3 -n default --rm -it --image=busybox:1.36 --restart=Never -- \
+  nslookup webapp-api-svc.webapp-stack                         # works
+
+# Name pattern:   <service>.<namespace>.svc.cluster.local
+# Why DNS?        Pod IPs change on every restart; names stay the same.
+# Apps use it:    pass a database's Service name in an env var (DB_HOST=mysql-svc) - never a Pod IP.

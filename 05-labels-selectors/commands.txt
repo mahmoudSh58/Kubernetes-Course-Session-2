@@ -1,0 +1,53 @@
+############################################################
+# 05 - LABELS & SELECTORS  (Chapter 5 part 1 - slides 38-40)
+# A selector is a query over labels - no IDs, no hard-coded names.
+############################################################
+
+# --- Slide 39: the six labelled Pods from the slide ---
+kubectl apply -f 05-labels-selectors/label-demo-pods.yaml
+kubectl get pods -n label-demo --show-labels
+
+# Equality-based
+kubectl get pods -n label-demo -l env=prod
+kubectl get pods -n label-demo -l app=webapp-api,env=prod     # pod-1, pod-4
+kubectl get pods -n label-demo -l 'app!=mysql'
+# Set-based
+kubectl get pods -n label-demo -l 'env in (prod,staging)'
+kubectl get pods -n label-demo -l 'env notin (prod)'
+kubectl get pods -n label-demo -l '!env'                       # pods WITHOUT env label (pod-5)
+# Show labels as columns
+kubectl get pods -n label-demo -L app,env
+
+kubectl delete namespace label-demo
+
+
+# --- Slide 40: working with labels on a real Deployment ---
+# needs webapp-config from 03-configmaps-secrets
+kubectl apply -f 05-labels-selectors/webapp-api-deployment.yaml
+kubectl get pods -n webapp-stack --show-labels
+
+kubectl label pod <pod> -n webapp-stack tier=frontend
+kubectl get pods -n webapp-stack -l app=webapp-api,tier=frontend
+kubectl get pods -n webapp-stack -l 'env in (prod,staging)'
+kubectl label pod <pod> -n webapp-stack tier-               # remove a label
+kubectl label pod <pod> -n webapp-stack env=dev --overwrite  # change a label
+
+# The same query a Service runs for you
+kubectl get pods -n webapp-stack -l app=webapp-api -o wide
+kubectl get endpointslices -n webapp-stack \
+  -l kubernetes.io/service-name=webapp-api-svc               # after 06-services
+
+# Demo (after the Service exists): remove the app label from one Pod
+#   -> it drops out of the EndpointSlice AND the ReplicaSet starts a replacement
+kubectl label pod <pod> -n webapp-stack app-
+kubectl get pods -n webapp-stack --show-labels
+kubectl delete pod <pod> -n webapp-stack                    # clean up the orphan Pod
+
+# Annotations (free-form notes for tools, NOT for selecting)
+kubectl annotate deployment webapp-api -n webapp-stack owner="mlops-mena"
+kubectl describe deployment webapp-api -n webapp-stack | grep -A2 Annotations
+
+# Label syntax: optional prefix/ + name (<=63 chars); values <=63 chars
+# Recommended scheme: app, env, tier
+
+# NOTE: keep webapp-api - 06-services, 07-dns-coredns and 08-ingress use it.

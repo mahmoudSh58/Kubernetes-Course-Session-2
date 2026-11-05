@@ -1,0 +1,50 @@
+############################################################
+# 00 - SETUP  (run once before the session)
+# Session 2: Storage, Configuration & Networking
+############################################################
+
+# --- Start the course cluster (Calico CNI, as used in the course) ---
+minikube start --cni=calico
+kubectl get nodes -o wide
+kubectl get pods -n kube-system
+
+# --- Namespace used by every demo today ---
+kubectl apply -f 00-setup/namespace.yaml
+#   or:  kubectl create namespace webapp-stack
+kubectl get ns webapp-stack
+
+# Optional: make webapp-stack the default namespace for this context
+kubectl config set-context --current --namespace=webapp-stack
+
+
+############################################################
+# minikube commands used today (Appendix slide 78)
+############################################################
+
+# Copy a local image into the nodes            -> fixes ErrImagePull on your own image   (Your app)
+minikube image load webapp-api:v1
+
+# List images the nodes have                   -> check that the load worked             (Your app)
+minikube image ls
+
+# Open a shell on the node                     -> look inside a hostPath folder /mnt/data (Storage)
+minikube ssh
+
+# Print a URL for a NodePort Service           -> open a NodePort from your laptop        (Services)
+minikube service <svc> -n <ns> --url
+
+# Print the node's IP                          -> build nodeIP:nodePort URLs              (Services)
+minikube ip
+
+# Give LoadBalancer and Ingress an address     -> EXTERNAL-IP stays <pending>             (Services, Ingress)
+minikube tunnel
+
+# Install the NGINX Ingress Controller         -> before any Ingress works                (Ingress)
+minikube addons enable ingress
+
+
+############################################################
+# Clean up everything at the end of the session
+############################################################
+kubectl delete namespace webapp-stack
+kubectl delete pv data-pv          # PVs are cluster-wide, not deleted with the namespace

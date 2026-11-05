@@ -1,0 +1,25 @@
+# Demo backend used by the Labels, Services, DNS and Ingress chapters.
+# nginx configured by webapp-config (03-configmaps-secrets) to listen on 8081.
+# Labels are set in the Pod TEMPLATE, not on single Pods (slide 40).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: webapp-api, namespace: webapp-stack }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: webapp-api } }
+  template:
+    metadata:
+      labels: { app: webapp-api, env: prod }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports: [{ name: http, containerPort: 8081 }]
+          envFrom: [{ configMapRef: { name: webapp-config } }]
+          volumeMounts:
+            - { name: conf, mountPath: /etc/nginx/conf.d }
+      volumes:
+        - name: conf
+          configMap:
+            name: webapp-config
+            items: [{ key: default.conf, path: default.conf }]

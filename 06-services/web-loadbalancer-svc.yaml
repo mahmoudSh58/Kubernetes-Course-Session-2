@@ -1,0 +1,12 @@
+# Slide 48 - LoadBalancer: declarative version of
+#   kubectl expose deployment webapp-api --name=web-lb --type=LoadBalancer --port=80 --target-port=8081
+# In the cloud this provisions a real load balancer; on minikube run "minikube tunnel".
+apiVersion: v1
+kind: Service
+metadata: { name: web-lb, namespace: webapp-stack }
+spec:
+  type: LoadBalancer
+  selector: { app: webapp-api }
+  ports:
+    - port: 80
+      targetPort: 8081

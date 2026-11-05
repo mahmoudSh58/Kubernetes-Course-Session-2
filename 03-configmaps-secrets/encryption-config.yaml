@@ -1,0 +1,19 @@
+# Slide 72 - Encrypting Secrets at rest in etcd  (REFERENCE ONLY - self-managed clusters)
+# File location on each control-plane node: /etc/kubernetes/enc/encryption-config.yaml
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources: [secrets]
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: <base64 32-byte key>   # head -c 32 /dev/urandom | base64
+      - identity: {}       # still read old plain-text data
+
+# kube-apiserver flag (static Pod on each control-plane node):
+#   --encryption-provider-config=/etc/kubernetes/enc/encryption-config.yaml
+# Re-write existing Secrets so they are stored encrypted:
+#   kubectl get secrets -A -o json | kubectl replace -f -
+# First provider wins: new writes use aescbc; identity lets old data still be read.
+# Managed clusters: use the cloud KMS envelope encryption option (kms v2 provider).

@@ -1,0 +1,8 @@
+# Slide 16 - On AWS the class points at the EBS CSI driver instead.
+# REFERENCE ONLY - needs the AWS EBS CSI driver (does not work on minikube).
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata: { name: gp3 }
+provisioner: ebs.csi.aws.com      # out-of-tree CSI driver
+parameters: { type: gp3, encrypted: "true" }
+volumeBindingMode: WaitForFirstConsumer   # disk is created in the zone of the first Pod

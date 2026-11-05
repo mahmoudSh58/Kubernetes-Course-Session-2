@@ -1,0 +1,84 @@
+############################################################
+# 11 - TROUBLESHOOTING STORAGE & NETWORKING  (slide 61)
+# Work from the outside in:  Ingress -> Service -> endpoints -> Pod
+############################################################
+
+# Overview of everything in the namespace
+kubectl get all,pvc,cm,secret,ingress,endpointslices -n webapp-stack
+kubectl get events -n webapp-stack --sort-by=.lastTimestamp | tail -n 20
+
+
+# --- PVC stuck Pending ---
+kubectl describe pvc <name> -n webapp-stack
+kubectl get pv
+kubectl get storageclass
+# Cause: no PV matches size, access mode or storageClassName (or no StorageClass can create one)
+
+
+# --- Job never completes ---
+kubectl get jobs,pods -n webapp-stack
+kubectl logs job/<name> -n webapp-stack
+kubectl describe job <name> -n webapp-stack
+# Cause: the command fails; check backoffLimit and the Pod's logs
+
+
+# --- ErrImagePull on your own image ---
+kubectl describe pod <pod> -n webapp-stack
+minikube image ls | grep <image>
+# Cause: image not loaded into minikube, wrong tag, or imagePullPolicy: Always
+
+
+# --- CreateContainerConfigError ---
+kubectl describe pod <pod> -n webapp-stack
+kubectl get cm,secret -n webapp-stack
+# Cause: ConfigMap / Secret (or a key inside it) referenced by the Pod does not exist
+
+
+# --- Service has no endpoints ---
+kubectl get endpointslices -n webapp-stack -l kubernetes.io/service-name=<svc>
+kubectl get svc <svc> -n webapp-stack -o jsonpath='{.spec.selector}'; echo
+kubectl get pods -n webapp-stack --show-labels
+# Cause: selector does not match Pod labels, or Pods not Ready (readiness probe)
+
+
+# --- Connection refused via Service ---
+kubectl exec -n webapp-stack <pod> -- curl -s localhost:8081      # does the app listen there?
+kubectl get svc <svc> -n webapp-stack -o yaml | grep -A3 ports
+# Cause: targetPort differs from the port the app listens on
+
+
+# --- DNS: app cannot resolve the database ---
+kubectl run dns-test -n webapp-stack --rm -it --image=busybox:1.36 --restart=Never -- \
+  nslookup mysql-svc
+kubectl get pods -n kube-system -l k8s-app=kube-dns
+# Cause: wrong Service name / namespace in DB_HOST, or CoreDNS not running
+
+
+# --- Ingress returns 404 ---
+kubectl describe ingress <name> -n webapp-stack
+kubectl get ingressclass
+# Cause: wrong path or ingressClassName, or rewrite-target missing
+
+
+# --- Ingress returns 502 / 503 ---
+kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=50
+kubectl get endpointslices -n webapp-stack
+# Cause: backend Service has no Ready endpoints (or wrong backend.service name/port)
+
+
+# --- No ADDRESS on the Ingress / EXTERNAL-IP <pending> ---
+kubectl get pods -n ingress-nginx          # is the controller installed and Running?
+minikube tunnel                            # needed on the Docker driver
+
+
+############################################################
+# Slide 63 - Which object do I need?
+############################################################
+# YOU NEED TO...                        USE                    EXAMPLE TODAY                       CHECK WITH
+# Keep data when the Pod is replaced    PersistentVolumeClaim  mysql-pvc at /var/lib/mysql         kubectl get pvc
+# Pass a normal setting                 ConfigMap              webapp-config: DB_HOST=mysql-svc    kubectl get cm
+# Pass a password                       Secret                 mysql-secret: DB_PASSWORD           kubectl get secret
+# Run work once                         Job                    seed-content                        kubectl get jobs
+# Run work on a schedule                CronJob                stamp, every minute                 kubectl get cj
+# Reach Pods inside the cluster         ClusterIP Service      mysql-svc:3306                      kubectl get endpointslices
+# Reach the app from a browser          Ingress + controller   /home -> webapp-api-svc             kubectl get ingress

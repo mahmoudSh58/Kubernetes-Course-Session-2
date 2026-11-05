@@ -1,0 +1,11 @@
+# Slide 29 - A ConfigMap used as env vars AND as a file
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: webapp-config, namespace: webapp-stack }
+data:
+  LOG_LEVEL: "info"
+  default.conf: |
+    server {
+      listen 8081;
+      location / { root /usr/share/nginx/html; }
+    }
